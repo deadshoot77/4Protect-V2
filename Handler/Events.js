@@ -1,34 +1,41 @@
-import config from "../config.json" with { type: 'json' }
-import fs from "fs"
+import path from 'node:path';
+import { pathToFileURL } from 'node:url';
+import { getJavaScriptFiles } from '../utils/loadFiles.js';
+import { logger } from '../utils/logger.js';
 
-export default async (bot) => {
-	const eventFiles = fs.readdirSync('./Events/').filter((file) => file.endsWith('.js'));
+const ignoredFiles = new Set(['loadDatabase.js', 'sendlog.js']);
 
-	for (const file of eventFiles) {
-		const event = (await import(`../Events/${file}`)).default;
+export default async function loadEvents(bot) {
+  const rootDir = path.resolve('./Events');
+  const files = (await getJavaScriptFiles(rootDir)).filter((file) => !ignoredFiles.has(path.basename(file)));
+  let loaded = 0;
 
-		if (event.once) {
-			bot.once(event.name, (...args) => event.execute(...args, bot, config));
-		} else {
-			bot.on(event.name, (...args) => event.execute(...args, bot, config));
-		}
-		console.log(`[EVENT] > ${file}`);
-	}
+  for (const file of files) {
+    try {
+      const module = await import(pathToFileURL(file).href);
+      const event = module?.default;
 
-	const eventSubFolders = fs.readdirSync('./Events/').filter((folder) => !folder.endsWith('.js'));
+      if (!event?.name || typeof event.execute !== 'function') {
+        logger.warn(`Event ignoré (export invalide): ${path.relative(rootDir, file)}`);
+        continue;
+      }
 
-	for (const folder of eventSubFolders) {
-		const subEventFiles = fs.readdirSync(`./Events/${folder}/`).filter((file) => file.endsWith('.js'));
+      const runner = (...args) => Promise.resolve(event.execute(...args, bot)).catch((error) => {
+        logger.error(`Erreur dans l'event ${event.name}.`, error);
+      });
 
-		for (const file of subEventFiles) {
-			const event = (await import(`../Events/${folder}/${file}`)).default;
+      if (event.once) {
+        bot.once(event.name, runner);
+      } else {
+        bot.on(event.name, runner);
+      }
 
-			if (event.once) {
-				bot.once(event.name, (...args) => event.execute(...args, bot, config));
-			} else {
-				bot.on(event.name, (...args) => event.execute(...args, bot, config));
-			}
-			console.log(`[EVENT] > ${file} - ${folder}`);
-		}
-	}
-};
+      loaded += 1;
+      logger.info(`Event chargé: ${path.relative(rootDir, file)}`);
+    } catch (error) {
+      logger.error(`Impossible de charger l'event ${path.relative(rootDir, file)}.`, error);
+    }
+  }
+
+  return loaded;
+}

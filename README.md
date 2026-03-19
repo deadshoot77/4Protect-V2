@@ -1,42 +1,93 @@
 # 4Protect V2
 
-## Fonctionnalités
-- Discord.js V14 
-- Database
-- Antiraid
-- Contact
-- Gestion
-- Information
-- Logs
-- Modération
-- Paramètres
-- Utilitaires
+Base Discord.js v14 orientée support / gestion, conservant l'architecture historique du dépôt (`Commands`, `SlashCommands`, `Events`, `Handler`) tout en modernisant le bootstrap, la sécurité et le déploiement.
 
-## Prérequis
-- [Node.js](https://nodejs.org/fr/download/current) (22.12+)
-- [Fichiers](https://github.com/4wip/4Protect-V2/archive/refs/heads/main.zip)
-- [Token](https://discord.com/developers/applications)
+## Stack
+- Node.js 20.11+ recommandé
+- ESM (`"type": "module"`)
+- `discord.js` v14
+- `discord-giveaways`
+- `sqlite3`
+- `@discordjs/rest`
+- `discord-api-types`
+- `date-fns`
+- `ms`
 
 ## Installation
-1. Configurer le config.json
-2. Installer les dépendances, en ouvrant l'invité de commande
-```bash
-npm install
+1. Copier l'exemple d'environnement :
+   ```bash
+   cp .env.example .env
+   ```
+2. Renseigner au minimum dans `.env` :
+   - `DISCORD_TOKEN`
+   - `CLIENT_ID`
+   - `GUILD_ID` si vous voulez déployer les slash commands uniquement sur une guilde de test
+3. Vérifier `config.json` pour les réglages publics.
+4. Installer les dépendances :
+   ```bash
+   npm install
+   ```
+
+## Configuration
+
+### `.env`
+Variables sensibles, **jamais** à mettre dans `config.json` :
+
+```env
+DISCORD_TOKEN=...
+CLIENT_ID=...
+GUILD_ID=... # optionnel
 ```
-3. Démarrer le bot
+
+### `config.json`
+Conserve les réglages non sensibles, par exemple :
+- `prefix`
+- `color`
+- `owners`
+- textes tickets / captcha
+- IDs publics nécessaires au fonctionnement de certaines commandes
+
+## Déployer les slash commands
+Déploiement guild si `GUILD_ID` est défini, sinon déploiement global.
+
 ```bash
-node index.js
+npm run deploy
 ```
 
-## Vidéo
-https://vidmoly.net/embed-1dojt45ftg4o.html (Installation Complète)
+Le script lit automatiquement toutes les slash commands présentes dans `SlashCommands/`.
 
-Pour mettre à jour, il suffit de conserver la database et la config puis de les glisser dans un dossier à jour
-https://github.com/user-attachments/assets/84079110-9257-45f9-9b3e-434cabf515c6
+## Lancer le bot
+```bash
+npm start
+```
 
-## Contribution
-Les contributions sont acceptées faîtes un pull requests/issues 
+Mode développement avec reload Node :
+```bash
+npm run dev
+```
+
+## Flux pris en charge
+- Commandes préfixées conservées
+- Slash commands conservées
+- Tickets via menu select + bouton de fermeture
+- Suggestions via modal
+- Confessions via modal + stockage SQLite
+- Captcha via bouton + attribution de rôle
+- Giveaways via `discord-giveaways`
+- Base SQLite initialisée automatiquement au démarrage
+
+## Notes de déploiement
+- Le bot exige les intents et permissions Discord adaptés à vos modules actifs.
+- Si les tickets ou le captcha échouent, vérifiez la hiérarchie des rôles et permissions du bot.
+- Pour un déploiement rapide en test, renseignez `GUILD_ID` avant `npm run deploy`.
+
+## Scripts
+```bash
+npm start
+npm run dev
+npm run deploy
+```
 
 ## Crédit
-- 4wip (Discord/([Github](https://github.com/4wip))
-- [Serveur Discord](https://discord.gg/26KgQQxMJ5)
+- 4wip
+- Base modernisée sans casser l'esprit 4Protect V2

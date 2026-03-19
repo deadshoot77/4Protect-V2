@@ -1,19 +1,18 @@
-const anticrashHandler = (bot) => {
-	bot.on('error', (err) => { console.log('Une erreur non-capturée est survenue:', err); });
+import { logger } from '../utils/logger.js';
 
-	process.on('uncaughtExceptionMonitor', (err, origin) => { console.log(err, origin); });
+export default function registerProcessHandlers(bot) {
+  bot.on('error', (error) => logger.error('Erreur Discord client.', error));
+  bot.rest.on('rateLimited', (info) => logger.warn(`Rate limit Discord REST: ${JSON.stringify(info)}`));
 
-	process.on('rejectionHandled', (err) => { console.log(err); });
+  process.on('unhandledRejection', (reason) => {
+    logger.error('Promesse non gérée.', reason);
+  });
 
-	process.on('warning', (warning) => { console.log(warning); });
+  process.on('uncaughtException', (error) => {
+    logger.error('Exception non capturée.', error);
+  });
 
-	process.on('uncaughtException', (error) => { console.log('Une erreur non-capturée est survenue:', error); });
-
-	process.on('unhandledRejection', (reason) => { console.log(reason); });
-
-	process.on('processTicksAndRejections', (request, reason) => { console.log('Une erreur réseau non-capturée est survenue:', reason); });
-
-	process.on('exit', (code) => { console.log(`Processus terminé avec le code ${code}`); });
-};
-
-export default anticrashHandler;
+  process.on('uncaughtExceptionMonitor', (error, origin) => {
+    logger.error(`uncaughtExceptionMonitor (${origin}).`, error);
+  });
+}

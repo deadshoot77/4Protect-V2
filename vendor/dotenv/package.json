@@ -1,0 +1,9 @@
+{
+  "name": "dotenv",
+  "version": "16.4.7",
+  "type": "module",
+  "exports": {
+    ".": "./index.js",
+    "./config": "./config.js"
+  }
+}
