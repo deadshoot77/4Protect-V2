@@ -1,21 +1,20 @@
 {
-	"token": "",
-	"owners": [
-		"",
-		""
-	],
-	"prefix": "+",
-	"color": "#6495ed",
-	"titre": "Support",
-	"description": "Pour contacter le staff, veuillez sélectionner une raison",
-	"tfooter": "Support",
-	"option1": "Problème bot",
-	"option2": "Suggestion",
-	"option3": "Autre",
-	"option4": "",
-	"ctitre": "​🚧​ Captcha",
-	"cdescription": "Clique sur le bouton ci-dessous pour te vérifier",
-	"ccolor": "#6495ED",
-	"cimage": "https://s4.anilist.co/file/anilistcdn/user/banner/b6882459-PAnDeNP93aAW.jpg",
-	"cemoji": "​<Gbutterfly1:1247866358645919745>​"
+  "owners": [
+    "",
+    ""
+  ],
+  "prefix": "+",
+  "color": "#6495ed",
+  "titre": "Support",
+  "description": "Pour contacter le staff, veuillez sélectionner une raison",
+  "tfooter": "Support",
+  "option1": "Problème bot",
+  "option2": "Suggestion",
+  "option3": "Autre",
+  "option4": "",
+  "ctitre": "​🚧​ Captcha",
+  "cdescription": "Clique sur le bouton ci-dessous pour te vérifier",
+  "ccolor": "#6495ED",
+  "cimage": "https://s4.anilist.co/file/anilistcdn/user/banner/b6882459-PAnDeNP93aAW.jpg",
+  "cemoji": "​<Gbutterfly1:1247866358645919745>​"
 }

@@ -1,35 +1,37 @@
-import fs from "fs"
+import path from 'node:path';
+import { pathToFileURL } from 'node:url';
+import { getJavaScriptFiles } from '../utils/loadFiles.js';
+import { logger } from '../utils/logger.js';
 
-export default async (bot) => {
-	const commandFiles = fs.readdirSync('./Commands/').filter((file) => file.endsWith('.js'));
+export default async function loadCommands(bot) {
+  const rootDir = path.resolve('./Commands');
+  const files = await getJavaScriptFiles(rootDir);
+  let loaded = 0;
 
-	for (const file of commandFiles) {
-		const props = (await import(`../Commands/${file}`))?.command;
-		bot.commands.set(props.command.name, props);
+  for (const file of files) {
+    try {
+      const module = await import(pathToFileURL(file).href);
+      const props = module?.command;
 
-		if (props.aliases && Array.isArray(props.aliases)) {
-			props.aliases.forEach((alias) => {
-				bot.commands.set(alias, props);
-			});
-		}
-		console.log(`[COMMAND] > ${file}`);
-	}
+      if (!props?.name || typeof props.run !== 'function') {
+        logger.warn(`Commande ignorée (export invalide): ${path.relative(rootDir, file)}`);
+        continue;
+      }
 
-	const commandSubFolders = fs.readdirSync('./Commands/').filter((folder) => !folder.endsWith('.js'));
+      bot.commands.set(props.name, props);
 
-	for (const folder of commandSubFolders) {
-		const subCommandFiles = fs.readdirSync(`./Commands/${folder}/`).filter((file) => file.endsWith('.js'));
+      if (Array.isArray(props.aliases)) {
+        for (const alias of props.aliases.filter(Boolean)) {
+          bot.commands.set(alias, props);
+        }
+      }
 
-		for (const file of subCommandFiles) {
-			const props = (await import(`../Commands/${folder}/${file}`))?.command;
-			bot.commands.set(props.name, props);
+      loaded += 1;
+      logger.info(`Commande chargée: ${path.relative(rootDir, file)}`);
+    } catch (error) {
+      logger.error(`Impossible de charger la commande ${path.relative(rootDir, file)}.`, error);
+    }
+  }
 
-			if (props.aliases && Array.isArray(props.aliases)) {
-				props.aliases.forEach((alias) => {
-					bot.commands.set(alias, props);
-				});
-			}
-			console.log(`[COMMAND] > ${file} - ${folder}`);
-		}
-	}
-};
+  return loaded;
+}

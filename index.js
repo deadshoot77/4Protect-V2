@@ -1,70 +1,117 @@
-import Discord from "discord.js"
-import { EmbedBuilder } from "discord.js";
-import config from "./config.json" with { type: 'json' }
-import { GiveawaysManager } from "discord-giveaways";
+import {
+  Client,
+  Collection,
+  GatewayIntentBits,
+  Partials,
+  EmbedBuilder,
+} from 'discord.js';
+import { GiveawaysManager } from 'discord-giveaways';
+import config from './config.json' with { type: 'json' };
+import { ensureRuntimeEnv, env } from './utils/env.js';
+import { logger } from './utils/logger.js';
+import loadCommands from './Handler/Commands.js';
+import loadSlashCommands from './Handler/slashCommands.js';
+import loadEvents from './Handler/Events.js';
+import registerProcessHandlers from './Handler/anticrash.js';
+import { initDatabase } from './Events/loadDatabase.js';
 
-const bot = new Discord.Client({
-	intents: 3276799,
-	partials: [
-		Discord.Partials.Channel,
-		Discord.Partials.Message,
-		Discord.Partials.User,
-		Discord.Partials.GuildMember,
-		Discord.Partials.Reaction,
-		Discord.Partials.ThreadMember,
-		Discord.Partials.GuildScheduledEvent
-	]
-});
+async function bootstrap() {
+  ensureRuntimeEnv();
+  await initDatabase();
 
-bot.commands = new Discord.Collection();
-bot.slashCommands = new Discord.Collection();
-bot.setMaxListeners(70);
+  const bot = new Client({
+    intents: [
+      GatewayIntentBits.Guilds,
+      GatewayIntentBits.GuildMembers,
+      GatewayIntentBits.GuildModeration,
+      GatewayIntentBits.GuildMessages,
+      GatewayIntentBits.GuildMessageReactions,
+      GatewayIntentBits.GuildVoiceStates,
+      GatewayIntentBits.GuildPresences,
+      GatewayIntentBits.MessageContent,
+      GatewayIntentBits.DirectMessages,
+    ],
+    partials: [
+      Partials.Channel,
+      Partials.Message,
+      Partials.Reaction,
+      Partials.User,
+      Partials.GuildMember,
+    ],
+  });
 
-bot.login(config.token)
-	.then(() => {
-		console.log(`[INFO] > ${bot.user.tag} est connecté`);
-		console.log(`[Invite] https://discord.com/oauth2/authorize?client_id=${bot.user.id}&permissions=8&integration_type=0&scope=bot`);
-		console.log(`[Support] https://dsc.gg/4wip`);
-	})
-	.catch((e) => {
-		console.log('\x1b[31m[!] — Please configure a valid bot token or allow all the intents\x1b[0m');
-	});
+  bot.commands = new Collection();
+  bot.slashCommands = new Collection();
+  bot.arrayOfSlashCommands = [];
+  bot.setMaxListeners(70);
 
-bot.giveawaysManager = new GiveawaysManager(bot, {
-	storage: './giveaways.json',
-	updateCountdownEvery: 5000,
-	default: {
-		botsCanWin: false,
-		embedColor: config.color,
-		reaction: "🎉"
-	}
-});
-bot.giveawaysManager.on('giveawayEnded', async (giveaway, winners) => {
-	const channel = await bot.channels.fetch(giveaway.channelId);
-	const message = await channel.messages.fetch(giveaway.messageId);
+  registerProcessHandlers(bot);
 
-	setTimeout(async () => {
-		const reaction = message.reactions.cache.get("🎉");
-		let participantsCount = 0;
-		if (reaction) {
-			const users = await reaction.users.fetch();
-			participantsCount = users.filter(u => !u.bot).size;
-		}
-		const embed = new EmbedBuilder()
-			.setTitle(giveaway.prize)
-			.setDescription(
-				`Fin: <t:${Math.floor(giveaway.endAt / 1000)}:R> <t:${Math.floor(giveaway.endAt / 1000)}:F>\n` +
-				`Organisé par: ${giveaway.hostedBy?.id || giveaway.hostedBy}\n` +
-				`Participants: ${participantsCount}\n` +
-				`Gagnant(s): ${winners.map(w => `<@${w.id}>`).join(', ') || "Aucun"}\n`
-			)
-			.setColor(config.color);
-		await message.edit({ embeds: [embed], components: [] });
-	}, 1000);
+  bot.giveawaysManager = new GiveawaysManager(bot, {
+    storage: './giveaways.json',
+    updateCountdownEvery: 5000,
+    default: {
+      botsCanWin: false,
+      embedColor: config.color,
+      reaction: '🎉',
+    },
+  });
+
+  bot.giveawaysManager.on('giveawayEnded', async (giveaway, winners) => {
+    try {
+      const channel = await bot.channels.fetch(giveaway.channelId).catch(() => null);
+      if (!channel?.isTextBased()) {
+        return;
+      }
+
+      const message = await channel.messages.fetch(giveaway.messageId).catch(() => null);
+      if (!message) {
+        logger.warn(`Message de giveaway introuvable après la fin: ${giveaway.messageId}`);
+        return;
+      }
+
+      const reaction = message.reactions.cache.get('🎉');
+      let participantsCount = 0;
+
+      if (reaction) {
+        const users = await reaction.users.fetch().catch(() => null);
+        participantsCount = users?.filter((user) => !user.bot).size ?? 0;
+      }
+
+      const hostedById = giveaway.hostedBy?.id ?? giveaway.hostedBy ?? 'Inconnu';
+      const winnerList = winners?.length ? winners.map((winner) => `<@${winner.id}>`).join(', ') : 'Aucun';
+
+      const embed = new EmbedBuilder()
+        .setTitle(giveaway.prize)
+        .setDescription(
+          `Fin: <t:${Math.floor(giveaway.endAt / 1000)}:R> <t:${Math.floor(giveaway.endAt / 1000)}:F>\n`
+          + `Organisé par: ${hostedById}\n`
+          + `Participants: ${participantsCount}\n`
+          + `Gagnant(s): ${winnerList}`,
+        )
+        .setColor(config.color);
+
+      await message.edit({ embeds: [embed], components: [] }).catch((error) => {
+        logger.warn(`Impossible de mettre à jour le giveaway ${giveaway.messageId}: ${error.message}`);
+      });
+    } catch (error) {
+      logger.error('Erreur pendant le traitement de fin de giveaway.', error);
+    }
+  });
+
+  const [commandCount, slashCount, eventCount] = await Promise.all([
+    loadCommands(bot),
+    loadSlashCommands(bot),
+    loadEvents(bot),
+  ]);
+
+  logger.info(`Chargement terminé: ${commandCount} commande(s), ${slashCount} slash command(s), ${eventCount} event(s).`);
+
+  await bot.login(env.token);
+  return bot;
 }
-);
-const commandHandler = (await import('./Handler/Commands.js')).default(bot);
-const slashcommandHandler = (await import('./Handler/slashCommands.js')).default(bot);
-const eventdHandler = (await import('./Handler/Events.js')).default(bot);
-const anticrashHandler = (await import('./Handler/anticrash.js')).default;
-anticrashHandler(bot);
+
+bootstrap().catch((error) => {
+  logger.error('Le bot n\'a pas pu démarrer proprement.', error);
+  process.exitCode = 1;
+});
